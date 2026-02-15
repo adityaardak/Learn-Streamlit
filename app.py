@@ -1136,6 +1136,438 @@ def demo_rerun_pattern():
 
     st.write("Rerun counter:", st.session_state["rerun_count"])
 
+def _rmse(y_true, y_pred):
+    return float(np.sqrt(mean_squared_error(y_true, y_pred)))
+
+def _get_iris():
+    data = load_iris(as_frame=True)
+    df = data.frame.copy()
+    X = df.drop(columns=["target"])
+    y = df["target"]
+    return df, X, y
+
+def _get_wine():
+    data = load_wine(as_frame=True)
+    df = data.frame.copy()
+    X = df.drop(columns=["target"])
+    y = df["target"]
+    return df, X, y
+
+def _get_diabetes_reg():
+    data = load_diabetes(as_frame=True)
+    df = data.frame.copy()
+    X = df.drop(columns=["target"])
+    y = df["target"]
+    return df, X, y
+
+
+# ================================
+# 1) Regression Trainer + Metrics (MAE/RMSE/R2)
+# ================================
+def demo_regression_trainer():
+    show_context_box(
+        function_name="Regression Trainer (Linear/Ridge/Lasso) + MAE/RMSE/R²",
+        uses="Teach DS students regression workflow, evaluation metrics, and regularization impact.",
+        syntax=(
+            "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)\n"
+            "pipe = Pipeline([('scaler', StandardScaler()), ('model', Ridge(alpha=1.0))])\n"
+            "pipe.fit(X_train, y_train)\n"
+            "pred = pipe.predict(X_test)\n"
+            "mae = mean_absolute_error(y_test, pred)\n"
+            "rmse = sqrt(mean_squared_error(y_test, pred))\n"
+            "r2 = r2_score(y_test, pred)"
+        ),
+        tips="Use Ridge/Lasso to show how regularization changes model behavior."
+    )
+
+    df, X, y = _get_diabetes_reg()
+    st.markdown("### Dataset: Diabetes (built-in sklearn regression dataset)")
+    st.dataframe(df.head(10), use_container_width=True, hide_index=True)
+
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        model_name = st.selectbox("Model", ["Linear Regression", "Ridge", "Lasso"])
+        test_size = st.slider("Test size", 0.1, 0.5, 0.2, 0.05)
+        random_state = st.number_input("Random state", 0, 9999, 42, 1)
+        use_scaler = st.checkbox("Use StandardScaler", value=True)
+
+        alpha = None
+        if model_name in ["Ridge", "Lasso"]:
+            alpha = st.slider("alpha (regularization strength)", 0.0, 5.0, 1.0, 0.1)
+
+        train_btn = st.button("Train Regression Model", type="primary")
+
+    with col2:
+        if train_btn:
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=float(test_size), random_state=int(random_state)
+            )
+
+            if model_name == "Linear Regression":
+                model = LinearRegression()
+            elif model_name == "Ridge":
+                model = Ridge(alpha=float(alpha))
+            else:
+                model = Lasso(alpha=float(alpha), max_iter=5000)
+
+            steps = []
+            if use_scaler:
+                steps.append(("scaler", StandardScaler()))
+            steps.append(("model", model))
+            pipe = Pipeline(steps)
+
+            with st.spinner("Training regression model..."):
+                time.sleep(0.4)
+                pipe.fit(X_train, y_train)
+
+            pred = pipe.predict(X_test)
+
+            mae = float(mean_absolute_error(y_test, pred))
+            rmse = _rmse(y_test, pred)
+            r2 = float(r2_score(y_test, pred))
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("MAE", f"{mae:.3f}")
+            c2.metric("RMSE", f"{rmse:.3f}")
+            c3.metric("R²", f"{r2:.3f}")
+
+            st.session_state["last_reg_model"] = pipe
+            st.session_state["last_reg_metrics"] = {"MAE": mae, "RMSE": rmse, "R2": r2, "model": model_name}
+
+            # Actual vs Pred plot
+            fig, ax = plt.subplots()
+            ax.scatter(y_test, pred)
+            ax.set_xlabel("Actual")
+            ax.set_ylabel("Predicted")
+            ax.set_title("Actual vs Predicted")
+            st.pyplot(fig)
+
+
+# ================================
+# 2) Cross-Validation Lab (KFold vs StratifiedKFold)
+# ================================
+def demo_cross_validation_lab():
+    show_context_box(
+        function_name="Cross-Validation Lab (KFold vs StratifiedKFold)",
+        uses="Teach model evaluation beyond a single split and why stratification matters in classification.",
+        syntax=(
+            "cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)\n"
+            "scores = cross_val_score(model, X, y, cv=cv, scoring='accuracy')\n"
+            "st.write(scores.mean())"
+        ),
+        tips="Use KFold for regression; StratifiedKFold for classification to keep class balance per fold."
+    )
+
+    dataset = st.selectbox("Dataset", ["Iris", "Wine"])
+    if dataset == "Iris":
+        _, X, y = _get_iris()
+    else:
+        _, X, y = _get_wine()
+
+    model = LogisticRegression(max_iter=200)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        n_splits = st.slider("n_splits", 2, 10, 5, 1)
+        shuffle = st.checkbox("shuffle", value=True)
+        rs = st.number_input("random_state", 0, 9999, 42, 1)
+
+        run_kfold = st.button("Run KFold", type="primary")
+
+    with col2:
+        run_strat = st.button("Run StratifiedKFold", type="primary")
+
+    if run_kfold:
+        cv = KFold(n_splits=int(n_splits), shuffle=bool(shuffle), random_state=int(rs) if shuffle else None)
+        pipe = Pipeline([("scaler", StandardScaler()), ("model", model)])
+        scores = cross_val_score(pipe, X, y, cv=cv, scoring="accuracy")
+        st.success("KFold completed ✅")
+        st.write("Scores:", np.round(scores, 4))
+        st.metric("Mean accuracy", f"{scores.mean():.4f}")
+        st.metric("Std", f"{scores.std():.4f}")
+
+    if run_strat:
+        cv = StratifiedKFold(n_splits=int(n_splits), shuffle=bool(shuffle), random_state=int(rs) if shuffle else None)
+        pipe = Pipeline([("scaler", StandardScaler()), ("model", model)])
+        scores = cross_val_score(pipe, X, y, cv=cv, scoring="accuracy")
+        st.success("StratifiedKFold completed ✅")
+        st.write("Scores:", np.round(scores, 4))
+        st.metric("Mean accuracy", f"{scores.mean():.4f}")
+        st.metric("Std", f"{scores.std():.4f}")
+
+
+# ================================
+# 3) Data Leakage Demo (Wrong vs Right scaling)
+# ================================
+def demo_data_leakage_scaling():
+    show_context_box(
+        function_name="Data Leakage Demo (Scaling Wrong vs Right)",
+        uses="Teach a common DS mistake: fitting scaler on full data before split causes leakage.",
+        syntax=(
+            "# WRONG:\n"
+            "scaler.fit(X)  # uses test info\n"
+            "X_scaled = scaler.transform(X)\n"
+            "...\n\n"
+            "# RIGHT:\n"
+            "pipe = Pipeline([('scaler', StandardScaler()), ('model', LogisticRegression())])\n"
+            "pipe.fit(X_train, y_train)"
+        ),
+        tips="Always preprocess inside a Pipeline so CV/train-test splitting stays clean."
+    )
+
+    _, X, y = _get_iris()
+    test_size = st.slider("Test size", 0.1, 0.5, 0.2, 0.05)
+    rs = st.number_input("random_state", 0, 9999, 42, 1)
+
+    if st.button("Run Leakage Demo", type="primary"):
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=float(test_size), random_state=int(rs), stratify=y)
+
+        # WRONG approach
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)  # leakage: uses all data
+        X_tr_w, X_te_w, y_tr_w, y_te_w = train_test_split(X_scaled, y, test_size=float(test_size), random_state=int(rs), stratify=y)
+        wrong_model = LogisticRegression(max_iter=200).fit(X_tr_w, y_tr_w)
+        wrong_acc = accuracy_score(y_te_w, wrong_model.predict(X_te_w))
+
+        # RIGHT approach
+        right_pipe = Pipeline([("scaler", StandardScaler()), ("model", LogisticRegression(max_iter=200))])
+        right_pipe.fit(X_train, y_train)
+        right_acc = accuracy_score(y_test, right_pipe.predict(X_test))
+
+        c1, c2 = st.columns(2)
+        c1.metric("WRONG (leakage) accuracy", f"{wrong_acc:.4f}")
+        c2.metric("RIGHT (pipeline) accuracy", f"{right_acc:.4f}")
+        st.info("Even if scores look similar sometimes, leakage is still invalid and can inflate results in real projects.")
+
+
+# ================================
+# 4) Feature Scaling Visual Demo (before/after)
+# ================================
+def demo_scaling_visual():
+    show_context_box(
+        function_name="Feature Scaling Visual (Before vs After)",
+        uses="Show why scaling matters: compare distributions before and after StandardScaler.",
+        syntax=(
+            "scaler = StandardScaler()\n"
+            "X_scaled = scaler.fit_transform(X)\n"
+            "st.dataframe(pd.DataFrame(X_scaled, columns=X.columns))"
+        ),
+        tips="Great when teaching LR, SVM, KNN."
+    )
+
+    _, X, _ = _get_wine()
+    feature = st.selectbox("Select feature", list(X.columns), index=0)
+
+    scaler = StandardScaler()
+    X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### Before Scaling")
+        fig1 = px.histogram(X, x=feature, nbins=25)
+        st.plotly_chart(fig1, use_container_width=True)
+
+    with col2:
+        st.markdown("### After Scaling")
+        fig2 = px.histogram(X_scaled, x=feature, nbins=25)
+        st.plotly_chart(fig2, use_container_width=True)
+
+
+# ================================
+# 5) Outlier Detection Lab (IQR method) + visualization
+# ================================
+def demo_outlier_detection_iqr():
+    show_context_box(
+        function_name="Outlier Detection (IQR Method)",
+        uses="Teach simple outlier detection and how removing outliers changes distribution.",
+        syntax=(
+            "Q1 = df[col].quantile(0.25)\n"
+            "Q3 = df[col].quantile(0.75)\n"
+            "IQR = Q3 - Q1\n"
+            "lower = Q1 - 1.5*IQR\n"
+            "upper = Q3 + 1.5*IQR\n"
+            "clean = df[(df[col]>=lower) & (df[col]<=upper)]"
+        )
+    )
+
+    df = sample_dataframe(250)
+    col = st.selectbox("Column", ["score"], index=0)
+
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - 1.5 * IQR
+    upper = Q3 + 1.5 * IQR
+
+    clean = df[(df[col] >= lower) & (df[col] <= upper)].copy()
+    outliers = df[(df[col] < lower) | (df[col] > upper)].copy()
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total rows", len(df))
+    c2.metric("Outliers", len(outliers))
+    c3.metric("After removal", len(clean))
+
+    fig = px.box(df, y=col, points="all", title="Box plot (outliers visible)")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("### Thresholds")
+    st.write({"lower": float(lower), "upper": float(upper)})
+
+
+# ================================
+# 6) Missing Value Handling Lab (mean/median/mode)
+# ================================
+def demo_missing_value_imputation():
+    show_context_box(
+        function_name="Missing Value Handling (Mean/Median/Mode)",
+        uses="Teach core preprocessing: identify missing values and fill them using common strategies.",
+        syntax=(
+            "df[col] = df[col].fillna(df[col].mean())\n"
+            "df[col] = df[col].fillna(df[col].median())\n"
+            "df[col] = df[col].fillna(df[col].mode()[0])"
+        )
+    )
+
+    df = sample_dataframe(120).copy()
+    # Inject missing values
+    df.loc[df.sample(12, random_state=7).index, "score"] = np.nan
+
+    strategy = st.selectbox("Strategy", ["Mean", "Median", "Mode"])
+    before_missing = int(df["score"].isna().sum())
+
+    if strategy == "Mean":
+        df["score"] = df["score"].fillna(df["score"].mean())
+    elif strategy == "Median":
+        df["score"] = df["score"].fillna(df["score"].median())
+    else:
+        df["score"] = df["score"].fillna(df["score"].mode()[0])
+
+    after_missing = int(df["score"].isna().sum())
+
+    c1, c2 = st.columns(2)
+    c1.metric("Missing before", before_missing)
+    c2.metric("Missing after", after_missing)
+
+    st.dataframe(df.head(20), use_container_width=True, hide_index=True)
+
+
+# ================================
+# 7) Encoding Lab (One-Hot for category)
+# ================================
+def demo_one_hot_encoding():
+    show_context_box(
+        function_name="Categorical Encoding (One-Hot Encoding)",
+        uses="Teach conversion of categorical columns into numeric features for ML models.",
+        syntax="encoded = pd.get_dummies(df, columns=['category'], drop_first=True)"
+    )
+
+    df = sample_dataframe(30)[["id", "score", "category"]].copy()
+    st.markdown("### Original data")
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    drop_first = st.checkbox("drop_first=True", value=True)
+    encoded = pd.get_dummies(df, columns=["category"], drop_first=drop_first)
+
+    st.markdown("### After One-Hot Encoding")
+    st.dataframe(encoded, use_container_width=True, hide_index=True)
+
+
+# ================================
+# 8) Train/Test Split Visual (class distribution)
+# ================================
+def demo_split_distribution_visual():
+    show_context_box(
+        function_name="Train/Test Split Visual (Class Distribution)",
+        uses="Teach why stratify is important: class balance in train and test splits.",
+        syntax=(
+            "X_train, X_test, y_train, y_test = train_test_split(\n"
+            "   X, y, test_size=0.2, stratify=y, random_state=42\n"
+            ")"
+        )
+    )
+
+    dataset = st.selectbox("Dataset", ["Iris", "Wine"])
+    if dataset == "Iris":
+        _, X, y = _get_iris()
+    else:
+        _, X, y = _get_wine()
+
+    test_size = st.slider("test_size", 0.1, 0.5, 0.2, 0.05)
+    rs = st.number_input("random_state", 0, 9999, 42, 1)
+    use_stratify = st.checkbox("Use stratify=y", value=True)
+
+    if st.button("Split & Visualize", type="primary"):
+        strat = y if use_stratify else None
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=float(test_size), random_state=int(rs), stratify=strat)
+
+        train_counts = y_train.value_counts().sort_index()
+        test_counts = y_test.value_counts().sort_index()
+
+        df_counts = pd.DataFrame({"train": train_counts, "test": test_counts}).fillna(0).astype(int)
+        st.dataframe(df_counts, use_container_width=True)
+
+        fig = px.bar(df_counts.reset_index().melt(id_vars="index", var_name="split", value_name="count"),
+                     x="index", y="count", color="split", barmode="group", title="Class Distribution")
+        fig.update_xaxes(title="Class")
+        st.plotly_chart(fig, use_container_width=True)
+
+
+# ================================
+# 9) Decision Boundary (2 features) - Logistic Regression on Iris
+# ================================
+def demo_decision_boundary_2d():
+    show_context_box(
+        function_name="Decision Boundary (2D) - Classification Visual",
+        uses="Teach how model learns separation when using only 2 features (classic DS visualization).",
+        syntax=(
+            "Use 2 columns from X\n"
+            "Train model\n"
+            "Create meshgrid\n"
+            "Predict on grid\n"
+            "Plot decision regions"
+        ),
+        tips="A great classroom demo for how adding features changes model behavior."
+    )
+
+    df, X, y = _get_iris()
+    features = st.multiselect("Pick exactly 2 features", list(X.columns), default=list(X.columns)[:2])
+
+    if len(features) != 2:
+        st.warning("Please select exactly 2 features.")
+        st.stop()
+
+    test_size = st.slider("test_size", 0.1, 0.5, 0.2, 0.05)
+    rs = st.number_input("random_state", 0, 9999, 42, 1)
+
+    if st.button("Plot Decision Boundary", type="primary"):
+        X2 = X[features].copy()
+        X_train, X_test, y_train, y_test = train_test_split(X2, y, test_size=float(test_size), random_state=int(rs), stratify=y)
+
+        pipe = Pipeline([("scaler", StandardScaler()), ("model", LogisticRegression(max_iter=300))])
+        pipe.fit(X_train, y_train)
+
+        # Meshgrid
+        x_min, x_max = X2[features[0]].min() - 0.5, X2[features[0]].max() + 0.5
+        y_min, y_max = X2[features[1]].min() - 0.5, X2[features[1]].max() + 0.5
+        xx, yy = np.meshgrid(np.linspace(x_min, x_max, 250), np.linspace(y_min, y_max, 250))
+
+        grid = pd.DataFrame({features[0]: xx.ravel(), features[1]: yy.ravel()})
+        zz = pipe.predict(grid).reshape(xx.shape)
+
+        fig, ax = plt.subplots()
+        ax.contourf(xx, yy, zz, alpha=0.25)
+        scatter = ax.scatter(X2[features[0]], X2[features[1]], c=y, s=30)
+        ax.set_xlabel(features[0])
+        ax.set_ylabel(features[1])
+        ax.set_title("Decision Regions (LogReg) with 2 Features")
+        st.pyplot(fig)
+
+        pred = pipe.predict(X_test)
+        acc = accuracy_score(y_test, pred)
+        st.metric("Test Accuracy", f"{acc:.3f}")
+
+
+
 # -----------------------------
 # Registry of features (Sidebar dropdown)
 # Add new items here: "Menu Label": demo_function
@@ -1178,25 +1610,73 @@ FEATURES = {
     "Toast Notifications": demo_toast_notifications,
     "Pipeline Status (st.status)": demo_status_pipeline,
     "Hyperparameter Form + Validation": demo_hyperparam_form_validation,
-    "Mini ML Trainer (sklearn) + Metrics": demo_train_evaluate_classification,
-    "Export Artifacts (Model + Metrics)": demo_export_artifacts,
-    "Quick EDA Lab": demo_eda_quick_lab,
-    "Data Filtering Lab": demo_data_filtering_lab,
     "Plotly EDA Lab": demo_plotly_eda_lab,
     "Rerun Pattern": demo_rerun_pattern,
+    "Regression Trainer (MAE/RMSE/R²)": demo_regression_trainer,
+    "Cross-Validation Lab": demo_cross_validation_lab,
+    "Data Leakage Demo (Scaling)": demo_data_leakage_scaling,
+    "Scaling Visual (Before/After)": demo_scaling_visual,
+    "Missing Value Imputation": demo_missing_value_imputation,
+    "One-Hot Encoding": demo_one_hot_encoding,
+    "Split Distribution Visual": demo_split_distribution_visual,
+    "Decision Boundary (2D)": demo_decision_boundary_2d,
 }
 
+DS_DEMOS = {
+    "EDA Dashboard Demo (filters + charts)": demo_data_filtering_lab,
+    "Mini ML Trainer (train + metrics)": demo_train_evaluate_classification,
+    "Quick EDA Lab (missing + corr)": demo_eda_quick_lab,
+    "Export Artifacts Demo (download model + json)": demo_export_artifacts,
+    "Outlier Detection Demo (IQR)": demo_outlier_detection_iqr,
+}
 
 # -----------------------------
 # Sidebar
 # -----------------------------
+# ================================
+# ✅ SIDEBAR: 2-level selector
+# 1) Streamlit Function Selector
+# 2) Data Science Demo Selector (contextual use)
+# ================================
+
 st.sidebar.header("🧭 Function Selector")
-selected_label = st.sidebar.selectbox("Select a Streamlit feature", list(FEATURES.keys()), index=0)
+selected_function = st.sidebar.selectbox(
+    "Select a Streamlit function",
+    list(FEATURES.keys()),
+    index=0
+)
 
 st.sidebar.markdown("---")
-st.sidebar.caption(
-    "Add new demos by creating a `demo_...()` function and registering it in the `FEATURES` dictionary."
+st.sidebar.subheader("🧪 Data Science Demos")
+
+# These demos are NOT “streamlit functions”, they are practical DS mini-scenarios
+# that show how the selected streamlit function becomes useful in real apps.
+selected_demo = st.sidebar.selectbox(
+    "Run a DS demo (practical use-case)",
+    ["None"] + list(DS_DEMOS.keys()),
+    index=0
 )
+
+st.sidebar.markdown("---")
+st.sidebar.caption("Tip: Learn the function first, then run a DS demo to see why it matters.")
+
+
+# ================================
+# ✅ MAIN: routing
+# Priority: if DS demo selected → run it
+# else → run selected function demo
+# ================================
+if selected_demo != "None":
+    DS_DEMOS[selected_demo]()     # DS use-case demo
+else:
+    if selected_function == "Welcome":
+        st.subheader("Welcome 👋")
+        st.write(
+            "Step 1: Select a Streamlit function from the left.\n"
+            "Step 2: (Optional) Select a Data Science demo to see how that function is used in real apps."
+        )
+    else:
+        FEATURES[selected_function]()  # Streamlit function demo
 
 
 # -----------------------------
