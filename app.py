@@ -1682,21 +1682,3 @@ else:
         FEATURES[selected_function]()  # Streamlit function demo
 
 
-# -----------------------------
-# Main display area
-# -----------------------------
-if selected_label == "Welcome":
-    st.subheader("Welcome 👋")
-    st.write(
-        "Use the left panel to choose a Streamlit function.\n\n"
-        "For each selection you will see:\n"
-        "1) Function name (header)\n"
-        "2) A context box with **use** and **syntax**\n"
-        "3) An interactive playground to test it"
-    )
-    st.info("Tip: This app is intentionally modular so you can add more demo functions easily.")
-else:
-    # Run the selected demo function
-    demo_fn = FEATURES[selected_label]
-    if demo_fn:
-        demo_fn()
