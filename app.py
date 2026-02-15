@@ -14,6 +14,18 @@ import time
 import pickle
 import matplotlib.pyplot as plt
 import plotly.express as px
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    classification_report,
+)
+from sklearn.datasets import load_iris, load_wine
+
 
 # -----------------------------
 # Page setup
@@ -717,6 +729,413 @@ def demo_session_state_advanced():
     else:
         st.info("Model not trained yet.")
 
+# ----------------------------
+# 1) st.write vs st.text vs st.caption vs st.markdown
+# ----------------------------
+def demo_text_display_variants():
+    show_context_box(
+        function_name="Text Display Variants (st.write, st.text, st.caption, st.markdown)",
+        uses="Teach students how to present explanations, notes, and formatting in a DS app.",
+        syntax=(
+            "st.write('Normal text or objects')\n"
+            "st.text('Monospace plain text')\n"
+            "st.caption('Small helper text')\n"
+            "st.markdown('**Markdown** with `code`')"
+        ),
+        tips="Use st.caption for small hints; st.markdown for rich formatting; st.text for raw logs."
+    )
+    st.write("st.write can render text, dataframes, dicts, and more.")
+    st.text("st.text shows plain monospace text (good for logs).")
+    st.caption("st.caption is subtle helper text.")
+    st.markdown("st.markdown supports **bold**, *italic*, `inline code`, lists, and headings.")
+
+
+# ----------------------------
+# 2) st.json + pretty dict outputs (for configs, metrics)
+# ----------------------------
+def demo_json_and_config_view():
+    show_context_box(
+        function_name="JSON Display (st.json) for Config & Metrics",
+        uses="Show training configs, model params, API responses, evaluation metrics as structured JSON.",
+        syntax="st.json({'model': 'LR', 'acc': 0.91, 'params': {'C': 1.0}})"
+    )
+    config = {
+        "dataset": "Iris",
+        "model": "LogisticRegression",
+        "metrics": {"accuracy": 0.91, "f1_macro": 0.88},
+        "params": {"C": 1.0, "max_iter": 200},
+    }
+    st.json(config)
+
+
+# ----------------------------
+# 3) st.empty placeholder (dynamic UI updates)
+# ----------------------------
+def demo_empty_placeholder():
+    show_context_box(
+        function_name="Dynamic Placeholders (st.empty)",
+        uses="Update the same area repeatedly: live logs, live metrics, progress updates.",
+        syntax=(
+            "slot = st.empty()\n"
+            "for i in range(5):\n"
+            "    slot.info(f'Step {i}')\n"
+            "    time.sleep(1)"
+        ),
+        tips="Great for simulated training loops and showing live metric updates."
+    )
+
+    slot = st.empty()
+    if st.button("Run placeholder demo", type="primary"):
+        for i in range(1, 6):
+            slot.info(f"Processing step {i}/5...")
+            time.sleep(0.6)
+        slot.success("Done ✅")
+
+
+# ----------------------------
+# 4) st.toast notifications (quick feedback)
+# ----------------------------
+def demo_toast_notifications():
+    show_context_box(
+        function_name="Toast Notifications (st.toast)",
+        uses="Give lightweight feedback without cluttering the page (great for DS apps).",
+        syntax="st.toast('Model trained successfully!')",
+        tips="Works well when user clicks buttons like Train, Export, Save settings."
+    )
+    if st.button("Show toast", type="primary"):
+        st.toast("✅ Action completed!")
+        st.toast("📌 Tip: Use toast for quick feedback.")
+
+
+# ----------------------------
+# 5) st.status (pipeline steps UI)
+# ----------------------------
+def demo_status_pipeline():
+    show_context_box(
+        function_name="Pipeline Status (st.status)",
+        uses="Show multi-step DS pipelines (load → clean → train → evaluate → export).",
+        syntax=(
+            "with st.status('Running...', expanded=True) as s:\n"
+            "    st.write('Step 1')\n"
+            "    s.update(label='Done', state='complete')"
+        ),
+        tips="Perfect to teach students the real ML workflow, step-by-step."
+    )
+
+    if st.button("Run pipeline status demo", type="primary"):
+        with st.status("Running DS pipeline...", expanded=True) as s:
+            st.write("1) Loading data...")
+            time.sleep(0.7)
+            st.write("2) Cleaning data...")
+            time.sleep(0.7)
+            st.write("3) Training model...")
+            time.sleep(0.7)
+            st.write("4) Evaluating metrics...")
+            time.sleep(0.7)
+            st.write("5) Exporting artifacts...")
+            time.sleep(0.7)
+            s.update(label="Pipeline complete ✅", state="complete")
+
+
+# ----------------------------
+# 6) st.form + validation + st.stop patterns (hyperparameter submission)
+# ----------------------------
+def demo_hyperparam_form_validation():
+    show_context_box(
+        function_name="Hyperparameter Form + Validation (st.form, st.stop)",
+        uses="Teach safe ML app patterns: collect params, validate, then train.",
+        syntax=(
+            "with st.form('hp'):\n"
+            "    C = st.number_input('C', 0.01, 10.0, 1.0)\n"
+            "    submit = st.form_submit_button('Train')\n"
+            "if submit:\n"
+            "    if C <= 0:\n"
+            "        st.error('Invalid C'); st.stop()"
+        )
+    )
+
+    with st.form("hp_form"):
+        C = st.number_input("LogReg C (inverse regularization)", min_value=0.01, max_value=10.0, value=1.0, step=0.01)
+        max_iter = st.number_input("max_iter", min_value=50, max_value=2000, value=200, step=50)
+        submit = st.form_submit_button("Validate & Save", type="primary")
+
+    if submit:
+        if C <= 0:
+            st.error("C must be > 0")
+            st.stop()
+        st.success("Hyperparameters validated ✅")
+        st.session_state["saved_hp"] = {"C": float(C), "max_iter": int(max_iter)}
+        st.json(st.session_state["saved_hp"])
+
+
+# ----------------------------
+# 7) DS Pipeline: Load dataset (Iris/Wine) + Train + Evaluate
+# ----------------------------
+def _get_dataset(name: str):
+    if name == "Iris":
+        data = load_iris(as_frame=True)
+    else:
+        data = load_wine(as_frame=True)
+    df = data.frame.copy()
+    X = df.drop(columns=[data.target_names is None and "target" or "target"]) if "target" in df.columns else df.drop(columns=[df.columns[-1]])
+    # In sklearn as_frame, the target column is named 'target'
+    X = df.drop(columns=["target"])
+    y = df["target"]
+    return df, X, y
+
+def demo_train_evaluate_classification():
+    show_context_box(
+        function_name="Mini ML Trainer (sklearn) + Metrics",
+        uses="Let students practice end-to-end: choose dataset, model, hyperparameters, train, and see report.",
+        syntax=(
+            "X_train, X_test, y_train, y_test = train_test_split(...)\n"
+            "pipe = Pipeline([('scaler', StandardScaler()), ('model', LogisticRegression())])\n"
+            "pipe.fit(X_train, y_train)\n"
+            "pred = pipe.predict(X_test)\n"
+            "st.write(accuracy_score(y_test, pred))\n"
+            "st.text(classification_report(y_test, pred))"
+        ),
+        tips="This is a real DS app pattern: sidebar config → train button → metrics + confusion matrix."
+    )
+
+    left, right = st.columns([1, 2])
+
+    with left:
+        dataset_name = st.selectbox("Dataset", ["Iris", "Wine"])
+        model_name = st.selectbox("Model", ["Logistic Regression", "Decision Tree"])
+
+        test_size = st.slider("Test size", 0.1, 0.5, 0.2, 0.05)
+        random_state = st.number_input("Random state", 0, 9999, 42, 1)
+
+        use_scaler = st.checkbox("Use StandardScaler (recommended for LR)", value=True)
+
+        if model_name == "Logistic Regression":
+            C = st.number_input("C", min_value=0.01, max_value=10.0, value=1.0, step=0.01)
+            max_iter = st.number_input("max_iter", min_value=50, max_value=2000, value=200, step=50)
+        else:
+            max_depth = st.number_input("max_depth", min_value=1, max_value=30, value=4, step=1)
+            min_samples_split = st.number_input("min_samples_split", min_value=2, max_value=50, value=2, step=1)
+
+        train_btn = st.button("Train & Evaluate", type="primary")
+
+    with right:
+        df, X, y = _get_dataset(dataset_name)
+        st.markdown("### Dataset preview")
+        st.dataframe(df.head(10), use_container_width=True, hide_index=True)
+
+        if train_btn:
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=float(test_size), random_state=int(random_state), stratify=y
+            )
+
+            if model_name == "Logistic Regression":
+                model = LogisticRegression(C=float(C), max_iter=int(max_iter))
+                if use_scaler:
+                    pipe = Pipeline([("scaler", StandardScaler()), ("model", model)])
+                else:
+                    pipe = Pipeline([("model", model)])
+            else:
+                model = DecisionTreeClassifier(
+                    max_depth=int(max_depth),
+                    min_samples_split=int(min_samples_split),
+                    random_state=int(random_state),
+                )
+                pipe = Pipeline([("model", model)])
+
+            with st.spinner("Training model..."):
+                time.sleep(0.4)
+                pipe.fit(X_train, y_train)
+
+            pred = pipe.predict(X_test)
+            acc = accuracy_score(y_test, pred)
+            st.success("Training complete ✅")
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Accuracy", f"{acc:.3f}")
+            c2.metric("Train rows", f"{len(X_train)}")
+            c3.metric("Test rows", f"{len(X_test)}")
+
+            st.markdown("### Classification report")
+            st.text(classification_report(y_test, pred))
+
+            st.markdown("### Confusion matrix")
+            cm = confusion_matrix(y_test, pred)
+            st.dataframe(pd.DataFrame(cm), use_container_width=True)
+
+            st.session_state["last_model"] = pipe
+            st.session_state["last_metrics"] = {"accuracy": float(acc), "dataset": dataset_name, "model": model_name}
+
+
+# ----------------------------
+# 8) Download last trained model + metrics (PKL/JSON)
+# ----------------------------
+def demo_export_artifacts():
+    show_context_box(
+        function_name="Export Artifacts (Download Model + Metrics)",
+        uses="Teach how DS apps export models and evaluation results for submissions or deployment.",
+        syntax=(
+            "model_bytes = pickle.dumps(model)\n"
+            "st.download_button('Download model', model_bytes, 'model.pkl')\n"
+            "st.download_button('Download metrics', json_bytes, 'metrics.json')"
+        ),
+        tips="This works best after running the Mini ML Trainer demo once."
+    )
+
+    model = st.session_state.get("last_model")
+    metrics = st.session_state.get("last_metrics")
+
+    if not model or not metrics:
+        st.warning("No trained model found in session. First run: 'Mini ML Trainer (sklearn) + Metrics'.")
+        st.stop()
+
+    model_bytes = pickle.dumps(model)
+    metrics_bytes = json.dumps(metrics, indent=2).encode("utf-8")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            "Download model.pkl",
+            data=model_bytes,
+            file_name="model.pkl",
+            mime="application/octet-stream",
+            type="primary",
+        )
+    with c2:
+        st.download_button(
+            "Download metrics.json",
+            data=metrics_bytes,
+            file_name="metrics.json",
+            mime="application/json",
+        )
+
+    st.json(metrics)
+
+
+# ----------------------------
+# 9) EDA: describe + missing + correlation heatmap (matplotlib)
+# ----------------------------
+def demo_eda_quick_lab():
+    show_context_box(
+        function_name="Quick EDA Lab (Describe, Missing, Correlation)",
+        uses="Teach students the first 10 minutes of any DS project inside Streamlit.",
+        syntax=(
+            "st.dataframe(df.head())\n"
+            "st.write(df.describe())\n"
+            "st.write(df.isna().sum())\n"
+            "st.pyplot(fig)"
+        ),
+        tips="Use this pattern with uploaded CSVs too (connect with file_uploader)."
+    )
+
+    df = sample_dataframe(80).copy()
+    # Add a few missing values for teaching
+    df.loc[df.sample(5, random_state=7).index, "score"] = np.nan
+
+    st.markdown("### Preview")
+    st.dataframe(df.head(12), use_container_width=True, hide_index=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("### Summary (describe)")
+        st.dataframe(df.describe(include="all"), use_container_width=True)
+
+    with c2:
+        st.markdown("### Missing values")
+        st.dataframe(df.isna().sum().to_frame("missing_count"), use_container_width=True)
+
+    st.markdown("### Correlation heatmap (numeric)")
+    num_df = df.select_dtypes(include=[np.number]).fillna(df.select_dtypes(include=[np.number]).mean())
+    corr = num_df.corr()
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(corr.values)
+    ax.set_xticks(range(len(corr.columns)))
+    ax.set_xticklabels(corr.columns, rotation=45, ha="right")
+    ax.set_yticks(range(len(corr.columns)))
+    ax.set_yticklabels(corr.columns)
+    fig.colorbar(im, ax=ax)
+    st.pyplot(fig)
+
+
+# ----------------------------
+# 10) Data Filtering Lab (query, slider, categorical filter)
+# ----------------------------
+def demo_data_filtering_lab():
+    show_context_box(
+        function_name="Data Filtering Lab (Dashboard Filters)",
+        uses="Teach students real dashboard filtering: numeric sliders + category selectors + search.",
+        syntax=(
+            "q = st.text_input('Search')\n"
+            "min_score, max_score = st.slider('Score range', ...)\n"
+            "cats = st.multiselect('Category', ...)\n"
+            "filtered = df[...]\n"
+            "st.dataframe(filtered)"
+        )
+    )
+
+    df = sample_dataframe(120)
+
+    q = st.text_input("Search by category (A/B/C) or leave blank", placeholder="Example: A")
+    min_score, max_score = st.slider("Score range", 0.0, 100.0, (40.0, 90.0), 1.0)
+    cats = st.multiselect("Category filter", sorted(df["category"].unique()), default=sorted(df["category"].unique()))
+
+    filtered = df[df["category"].isin(cats)].copy()
+    filtered = filtered[(filtered["score"] >= min_score) & (filtered["score"] <= max_score)]
+    if q.strip():
+        filtered = filtered[filtered["category"].str.contains(q.strip(), case=False, na=False)]
+
+    st.metric("Rows after filter", len(filtered))
+    st.dataframe(filtered, use_container_width=True, hide_index=True)
+    st.line_chart(filtered.set_index("date")["score"])
+
+
+# ----------------------------
+# 11) Plotly EDA Lab (interactive histogram + scatter)
+# ----------------------------
+def demo_plotly_eda_lab():
+    show_context_box(
+        function_name="Interactive Plotly EDA Lab",
+        uses="Teach hover/zoom charts for EDA: histogram and scatter with category color.",
+        syntax=(
+            "fig = px.histogram(df, x='score', color='category')\n"
+            "st.plotly_chart(fig)\n"
+            "fig2 = px.scatter(df, x='id', y='score', color='category')\n"
+            "st.plotly_chart(fig2)"
+        )
+    )
+
+    df = sample_dataframe(200)
+    fig = px.histogram(df, x="score", color="category", nbins=20)
+    st.plotly_chart(fig, use_container_width=True)
+
+    fig2 = px.scatter(df, x="id", y="score", color="category")
+    st.plotly_chart(fig2, use_container_width=True)
+
+
+# ----------------------------
+# 12) Button actions with st.rerun pattern (safe)
+# ----------------------------
+def demo_rerun_pattern():
+    show_context_box(
+        function_name="Rerun Pattern (Action → Update State → Rerun)",
+        uses="Teach multi-step DS flows where you update session_state and immediately refresh UI.",
+        syntax=(
+            "if st.button('Reset filters'):\n"
+            "    st.session_state['x'] = 0\n"
+            "    st.rerun()"
+        ),
+        tips="Use this to reset dashboards or clear previous model results."
+    )
+
+    if "rerun_count" not in st.session_state:
+        st.session_state["rerun_count"] = 0
+
+    if st.button("Increment + rerun", type="primary"):
+        st.session_state["rerun_count"] += 1
+        st.rerun()
+
+    st.write("Rerun counter:", st.session_state["rerun_count"])
+
 # -----------------------------
 # Registry of features (Sidebar dropdown)
 # Add new items here: "Menu Label": demo_function
@@ -753,6 +1172,18 @@ FEATURES = {
     "Model Download (PKL)": demo_model_download,
     "Conditional Rendering": demo_conditional_rendering,
     "Advanced Session State": demo_session_state_advanced,
+    "Text Display Variants": demo_text_display_variants,
+    "JSON / Config Viewer": demo_json_and_config_view,
+    "Dynamic Placeholder (st.empty)": demo_empty_placeholder,
+    "Toast Notifications": demo_toast_notifications,
+    "Pipeline Status (st.status)": demo_status_pipeline,
+    "Hyperparameter Form + Validation": demo_hyperparam_form_validation,
+    "Mini ML Trainer (sklearn) + Metrics": demo_train_evaluate_classification,
+    "Export Artifacts (Model + Metrics)": demo_export_artifacts,
+    "Quick EDA Lab": demo_eda_quick_lab,
+    "Data Filtering Lab": demo_data_filtering_lab,
+    "Plotly EDA Lab": demo_plotly_eda_lab,
+    "Rerun Pattern": demo_rerun_pattern,
 }
 
 
