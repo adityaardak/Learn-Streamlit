@@ -1615,14 +1615,7 @@ FEATURES = {
     "Hyperparameter Form + Validation": demo_hyperparam_form_validation,
     "Plotly EDA Lab": demo_plotly_eda_lab,
     "Rerun Pattern": demo_rerun_pattern,
-    "Regression Trainer (MAE/RMSE/R²)": demo_regression_trainer,
-    "Cross-Validation Lab": demo_cross_validation_lab,
-    "Data Leakage Demo (Scaling)": demo_data_leakage_scaling,
-    "Scaling Visual (Before/After)": demo_scaling_visual,
-    "Missing Value Imputation": demo_missing_value_imputation,
-    "One-Hot Encoding": demo_one_hot_encoding,
-    "Split Distribution Visual": demo_split_distribution_visual,
-    "Decision Boundary (2D)": demo_decision_boundary_2d,
+    
 }
 
 DS_DEMOS = {
@@ -1631,6 +1624,14 @@ DS_DEMOS = {
     "Quick EDA Lab (missing + corr)": demo_eda_quick_lab,
     "Export Artifacts Demo (download model + json)": demo_export_artifacts,
     "Outlier Detection Demo (IQR)": demo_outlier_detection_iqr,
+    "Regression Trainer (MAE/RMSE/R²)": demo_regression_trainer,
+    "Cross-Validation Lab": demo_cross_validation_lab,
+    "Data Leakage Demo (Scaling)": demo_data_leakage_scaling,
+    "Scaling Visual (Before/After)": demo_scaling_visual,
+    "Missing Value Imputation": demo_missing_value_imputation,
+    "One-Hot Encoding": demo_one_hot_encoding,
+    "Split Distribution Visual": demo_split_distribution_visual,
+    "Decision Boundary (2D)": demo_decision_boundary_2d,
 }
 
 # -----------------------------
