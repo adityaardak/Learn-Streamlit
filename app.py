@@ -10,7 +10,10 @@ from datetime import date, datetime
 import numpy as np
 import pandas as pd
 import streamlit as st
-
+import time
+import pickle
+import matplotlib.pyplot as plt
+import plotly.express as px
 
 # -----------------------------
 # Page setup
@@ -537,6 +540,183 @@ def demo_code_markdown_json():
     st.json({"topic": "streamlit", "level": "beginner", "ok": True})
 
 
+# 1️⃣ DataFrame vs Table
+def demo_dataframe_vs_table():
+    show_context_box(
+        function_name="Data Display: st.dataframe vs st.table",
+        uses="Understand difference between interactive and static table display.",
+        syntax="st.dataframe(df)\nst.table(df)",
+        tips="st.dataframe is interactive. st.table is static."
+    )
+
+    df = sample_dataframe(15)
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### st.dataframe (Interactive)")
+        st.dataframe(df, use_container_width=True)
+
+    with col2:
+        st.markdown("### st.table (Static)")
+        st.table(df)
+
+
+# 2️⃣ Caching Demo
+@st.cache_data
+def cached_load_data():
+    time.sleep(2)
+    return sample_dataframe(50)
+
+def load_data_without_cache():
+    time.sleep(2)
+    return sample_dataframe(50)
+
+def demo_caching():
+    show_context_box(
+        function_name="Caching (st.cache_data)",
+        uses="Avoid recomputing expensive functions.",
+        syntax="@st.cache_data\ndef load_data():\n    return pd.read_csv('file.csv')"
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("Load without cache"):
+            start = time.time()
+            load_data_without_cache()
+            st.write("Time:", round(time.time() - start, 2), "seconds")
+
+    with col2:
+        if st.button("Load with cache"):
+            start = time.time()
+            cached_load_data()
+            st.write("Time:", round(time.time() - start, 2), "seconds")
+
+
+# 3️⃣ Sidebar Controls
+def demo_sidebar_controls():
+    show_context_box(
+        function_name="Sidebar Controls",
+        uses="Place filters in sidebar for dashboards.",
+        syntax="value = st.sidebar.slider('Select value', 0, 100, 50)"
+    )
+
+    value = st.sidebar.slider("Sidebar Slider", 0, 100, 50)
+    st.write("Selected value:", value)
+
+
+# 4️⃣ Metrics Dashboard
+def demo_metrics_dashboard():
+    show_context_box(
+        function_name="Metrics (st.metric)",
+        uses="Display KPIs like Accuracy, Revenue.",
+        syntax="st.metric('Accuracy', 0.92, '+0.03')"
+    )
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Accuracy", "0.91", "+0.02")
+    col2.metric("Loss", "0.12", "-0.01")
+    col3.metric("Users", "1250", "+120")
+
+
+# 5️⃣ Matplotlib Integration
+def demo_matplotlib():
+    show_context_box(
+        function_name="Matplotlib (st.pyplot)",
+        uses="Display custom matplotlib figures.",
+        syntax="fig, ax = plt.subplots()\nax.plot(x,y)\nst.pyplot(fig)"
+    )
+
+    df = sample_dataframe(30)
+    fig, ax = plt.subplots()
+    ax.plot(df["id"], df["score"])
+    ax.set_title("Matplotlib Plot")
+    st.pyplot(fig)
+
+
+# 6️⃣ Plotly Integration
+def demo_plotly():
+    show_context_box(
+        function_name="Plotly (st.plotly_chart)",
+        uses="Interactive visualizations.",
+        syntax="fig = px.scatter(df, x='id', y='score')\nst.plotly_chart(fig)"
+    )
+
+    df = sample_dataframe(50)
+    fig = px.scatter(df, x="id", y="score", color="category")
+    st.plotly_chart(fig)
+
+
+# 7️⃣ Stop Execution
+def demo_stop_execution():
+    show_context_box(
+        function_name="Stop Execution (st.stop)",
+        uses="Stop script if condition fails.",
+        syntax="if not uploaded:\n    st.stop()"
+    )
+
+    uploaded = st.file_uploader("Upload CSV")
+
+    if not uploaded:
+        st.error("Upload a file first.")
+        st.stop()
+
+    df = pd.read_csv(uploaded)
+    st.success("File Loaded")
+    st.dataframe(df)
+
+
+# 8️⃣ Model Download (PKL)
+def demo_model_download():
+    show_context_box(
+        function_name="Download Model (PKL)",
+        uses="Allow users to download trained ML models.",
+        syntax="pickle.dumps(model)\nst.download_button(...)"
+    )
+
+    dummy_model = {"model": "Logistic Regression", "accuracy": 0.91}
+    model_bytes = pickle.dumps(dummy_model)
+
+    st.download_button(
+        "Download Dummy Model",
+        data=model_bytes,
+        file_name="model.pkl",
+        mime="application/octet-stream"
+    )
+
+
+# 9️⃣ Conditional Rendering
+def demo_conditional_rendering():
+    show_context_box(
+        function_name="Conditional Rendering",
+        uses="Display content based on user input.",
+        syntax="if st.checkbox('Show chart'):\n    st.line_chart(data)"
+    )
+
+    df = sample_dataframe(40)
+    if st.checkbox("Show Chart"):
+        st.line_chart(df["score"])
+
+
+# 🔟 Advanced Session State
+def demo_session_state_advanced():
+    show_context_box(
+        function_name="Advanced Session State",
+        uses="Store workflow state between reruns.",
+        syntax="if 'trained' not in st.session_state:\n    st.session_state['trained'] = False"
+    )
+
+    if "trained" not in st.session_state:
+        st.session_state["trained"] = False
+
+    if st.button("Train Model"):
+        st.session_state["trained"] = True
+
+    if st.session_state["trained"]:
+        st.success("Model trained and stored in session.")
+    else:
+        st.info("Model not trained yet.")
+
 # -----------------------------
 # Registry of features (Sidebar dropdown)
 # Add new items here: "Menu Label": demo_function
@@ -563,6 +743,16 @@ FEATURES = {
     "Session State": demo_session_state,
     "Progress & Spinner": demo_progress_spinner,
     "Text/Code/Markdown/JSON": demo_code_markdown_json,
+     "DataFrame vs Table": demo_dataframe_vs_table,
+    "Caching": demo_caching,
+    "Sidebar Controls": demo_sidebar_controls,
+    "Metrics Dashboard": demo_metrics_dashboard,
+    "Matplotlib": demo_matplotlib,
+    "Plotly": demo_plotly,
+    "Stop Execution": demo_stop_execution,
+    "Model Download (PKL)": demo_model_download,
+    "Conditional Rendering": demo_conditional_rendering,
+    "Advanced Session State": demo_session_state_advanced,
 }
 
 
