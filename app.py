@@ -1682,4 +1682,92 @@ else:
     else:
         FEATURES[selected_function]()  # Streamlit function demo
 
+# ================================
+# 📦 PREREQUISITES BOX (Bottom of App)
+# ================================
+
+st.markdown("---")
+st.markdown("## 📦 Before You Copy Any Demo Code")
+
+with st.expander("⚙️ Required Prerequisites & Setup Code (Click to Expand)", expanded=False):
+
+    st.markdown("### 1️⃣ Install Required Libraries")
+
+    st.code(
+        """pip install streamlit pandas numpy scikit-learn matplotlib plotly""",
+        language="bash"
+    )
+
+    st.markdown("### 2️⃣ Required Imports")
+
+    st.code(
+        """import streamlit as st
+import pandas as pd
+import numpy as np
+import time
+import pickle
+import matplotlib.pyplot as plt
+import plotly.express as px
+
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, Lasso
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.datasets import load_iris, load_wine, load_diabetes
+""",
+        language="python"
+    )
+
+    st.markdown("### 3️⃣ Required Helper Functions")
+
+    st.code(
+        """def sample_dataframe(rows=20):
+    rng = np.random.default_rng(7)
+    df = pd.DataFrame({
+        "id": np.arange(1, rows + 1),
+        "score": np.round(rng.normal(70, 10, size=rows), 2),
+        "category": rng.choice(["A", "B", "C"], size=rows),
+        "date": pd.date_range("2026-01-01", periods=rows, freq="D"),
+    })
+    return df
+
+
+def show_context_box(function_name, uses, syntax, tips=None):
+    st.subheader(function_name)
+
+    with st.container(border=True):
+        st.markdown("### ✅ Use")
+        st.write(uses)
+
+        st.markdown("### 🧾 Syntax")
+        st.code(syntax, language="python")
+
+        if tips:
+            st.markdown("### 💡 Notes")
+            st.write(tips)
+""",
+        language="python"
+    )
+
+    st.markdown("### 4️⃣ If Using ML Demos")
+
+    st.code(
+        """# Example dataset loader
+def get_iris_dataset():
+    from sklearn.datasets import load_iris
+    data = load_iris(as_frame=True)
+    df = data.frame.copy()
+    X = df.drop(columns=["target"])
+    y = df["target"]
+    return df, X, y
+""",
+        language="python"
+    )
+
+    st.success("Now you can safely copy any demo function and it will run without errors.")
+
+st.caption("Tip: Always copy prerequisites first, then paste demo functions below them.")
 
